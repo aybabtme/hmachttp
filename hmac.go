@@ -36,6 +36,12 @@ type Keystore interface {
 	GetPrivateKeyByID(ctx context.Context, keyID string) ([]byte, bool, error)
 }
 
+func Securer(keystore Keystore, headerKey string, maxClockSkew time.Duration, unauth http.Handler) func(http.Handler) http.Handler {
+	return func(in http.Handler) http.Handler {
+		return Handler(in, keystore, headerKey, maxClockSkew, unauth)
+	}
+}
+
 func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew time.Duration, unauth http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hmacValueb64 := r.Header.Get(headerKey)
