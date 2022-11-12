@@ -104,28 +104,11 @@ func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew 
 // RoundTripper add authentication to outgoing requests.
 func RoundTripper(in http.RoundTripper, headerKey, keyID string, privateKey []byte) http.RoundTripper {
 	return roundtripper(func(r *http.Request) (*http.Response, error) {
-		now := time.Now()
-		msg := hmacMessage{
-			KeyID:     keyID,
-			UnixMicro: now.UnixMicro(),
-		}
-		signedMessage, err := json.Marshal(msg)
+		hmacValue, err := GenerateHeader(keyID, privateKey)
 		if err != nil {
-			return nil, errors.Wrap(err, "marshaling HMAC message")
+			return nil, err
 		}
-		h := hmac.New(sha256.New, privateKey)
-		h.Write(signedMessage)
-		sig := h.Sum(nil)
-
-		hmacValue, err := json.Marshal(hmacEnvelope{
-			Msg:       signedMessage,
-			Signature: sig,
-		})
-		if err != nil {
-			return nil, errors.Wrap(err, "marshaling HMAC value")
-		}
-
-		r.Header.Set(headerKey, base64.URLEncoding.EncodeToString(hmacValue))
+		r.Header.Set(headerKey, hmacValue)
 
 		return in.RoundTrip(r)
 	})
@@ -135,4 +118,28 @@ type roundtripper func(*http.Request) (*http.Response, error)
 
 func (fn roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	return fn(r)
+}
+
+func GenerateHeader(keyID string, privateKey []byte) (string, error) {
+	now := time.Now()
+	msg := hmacMessage{
+		KeyID:     keyID,
+		UnixMicro: now.UnixMicro(),
+	}
+	signedMessage, err := json.Marshal(msg)
+	if err != nil {
+		return "", errors.Wrap(err, "marshaling HMAC message")
+	}
+	h := hmac.New(sha256.New, privateKey)
+	h.Write(signedMessage)
+	sig := h.Sum(nil)
+
+	hmacValue, err := json.Marshal(hmacEnvelope{
+		Msg:       signedMessage,
+		Signature: sig,
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "marshaling HMAC value")
+	}
+	return base64.URLEncoding.EncodeToString(hmacValue), nil
 }
