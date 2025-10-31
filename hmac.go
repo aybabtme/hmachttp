@@ -53,18 +53,18 @@ func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew 
 		}
 		hmacValue, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(hmacValueb64)
 		if err != nil {
-			unauth(w, r, "decoding-base-64")
+			unauth(w, r, "decoding-base-64: "+err.Error())
 			return
 		}
 		var env hmacEnvelope
 		if err := json.Unmarshal(hmacValue, &env); err != nil {
-			unauth(w, r, "unmarshal-envelope")
+			unauth(w, r, "unmarshal-envelope: "+err.Error())
 			return
 		}
 		signedMessage := env.Msg
 		var msg hmacMessage
 		if err := json.Unmarshal(env.Msg, &msg); err != nil {
-			unauth(w, r, "unmarshal-signed-message")
+			unauth(w, r, "unmarshal-signed-message: "+err.Error())
 			return
 		}
 		if msg.KeyID == "" {
@@ -73,7 +73,10 @@ func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew 
 		}
 		ctx := r.Context()
 		privateKey, ok, err := keystore.GetPrivateKeyByID(ctx, msg.KeyID)
-		if err != nil || !ok {
+		if err != nil {
+			unauth(w, r, "get-private-key: "+err.Error())
+			return
+		} else if !ok {
 			unauth(w, r, "no-matching-key")
 			return
 		}
