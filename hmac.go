@@ -51,7 +51,7 @@ func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew 
 			unauth(w, r, "no-header")
 			return
 		}
-		hmacValue, err := base64.URLEncoding.DecodeString(hmacValueb64)
+		hmacValue, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(hmacValueb64)
 		if err != nil {
 			unauth(w, r, "decoding-base-64")
 			return
@@ -143,5 +143,5 @@ func GenerateHeader(keyID string, privateKey []byte) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "marshaling HMAC value")
 	}
-	return base64.URLEncoding.EncodeToString(hmacValue), nil
+	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(hmacValue), nil
 }
