@@ -36,43 +36,45 @@ type Keystore interface {
 	GetPrivateKeyByID(ctx context.Context, keyID string) ([]byte, bool, error)
 }
 
-func Securer(keystore Keystore, headerKey string, maxClockSkew time.Duration, unauth http.Handler) func(http.Handler) http.Handler {
+func Securer(keystore Keystore, headerKey string, maxClockSkew time.Duration, unauth Reject) func(http.Handler) http.Handler {
 	return func(in http.Handler) http.Handler {
 		return Handler(in, keystore, headerKey, maxClockSkew, unauth)
 	}
 }
 
-func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew time.Duration, unauth http.Handler) http.Handler {
+type Reject func(w http.ResponseWriter, r *http.Request, cause string)
+
+func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew time.Duration, unauth Reject) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hmacValueb64 := r.Header.Get(headerKey)
 		if hmacValueb64 == "" {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "no-header")
 			return
 		}
 		hmacValue, err := base64.URLEncoding.DecodeString(hmacValueb64)
 		if err != nil {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "decoding-base-64")
 			return
 		}
 		var env hmacEnvelope
 		if err := json.Unmarshal(hmacValue, &env); err != nil {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "unmarshal-envelope")
 			return
 		}
 		signedMessage := env.Msg
 		var msg hmacMessage
 		if err := json.Unmarshal(env.Msg, &msg); err != nil {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "unmarshal-signed-message")
 			return
 		}
 		if msg.KeyID == "" {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "empty-key-id")
 			return
 		}
 		ctx := r.Context()
 		privateKey, ok, err := keystore.GetPrivateKeyByID(ctx, msg.KeyID)
 		if err != nil || !ok {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "no-matching-key")
 			return
 		}
 
@@ -82,7 +84,7 @@ func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew 
 
 		// if signature mismatches
 		if !hmac.Equal(env.Signature, sig) {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "signature-mismatch")
 			return
 		}
 
@@ -92,7 +94,7 @@ func Handler(in http.Handler, keystore Keystore, headerKey string, maxClockSkew 
 		minSignedAt := now.Add(-maxClockSkew)
 		maxSignedAt := now.Add(maxClockSkew)
 		if signedAt.Before(minSignedAt) || signedAt.After(maxSignedAt) {
-			unauth.ServeHTTP(w, r)
+			unauth(w, r, "signature-too-old")
 			return
 		}
 		r = r.WithContext(context.WithValue(ctx, ctxPrivateKeyID{}, msg.KeyID))

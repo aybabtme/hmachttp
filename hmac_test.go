@@ -33,10 +33,10 @@ func TestAuthHMAC(t *testing.T) {
 		keystore,
 		hmachttp.HeaderKey,
 		100*time.Millisecond,
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, r *http.Request, cause string) {
 			t.Error("should have been authed")
 			w.WriteHeader(http.StatusUnauthorized)
-		}),
+		},
 	))
 	defer srv.Close()
 
@@ -69,10 +69,10 @@ func TestUnauthHMAC_BadKey(t *testing.T) {
 		keystore,
 		hmachttp.HeaderKey,
 		100*time.Millisecond,
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, r *http.Request, cause string) {
 			reachedUnauthedEndpoint = true
 			w.WriteHeader(wantCode)
-		}),
+		},
 	))
 	defer srv.Close()
 
@@ -104,10 +104,10 @@ func TestUnauthHMAC_BadKeyID(t *testing.T) {
 		keystore,
 		hmachttp.HeaderKey,
 		100*time.Millisecond,
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, r *http.Request, cause string) {
 			reachedUnauthedEndpoint = true
 			w.WriteHeader(wantCode)
-		}),
+		},
 	))
 	defer srv.Close()
 
@@ -139,10 +139,10 @@ func TestUnauthHMAC_WrongHeader(t *testing.T) {
 		keystore,
 		hmachttp.HeaderKey,
 		100*time.Millisecond,
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, r *http.Request, cause string) {
 			reachedUnauthedEndpoint = true
 			w.WriteHeader(wantCode)
-		}),
+		},
 	))
 	defer srv.Close()
 
@@ -167,10 +167,10 @@ func TestUnauthHMAC_NoSignature(t *testing.T) {
 		keystore,
 		hmachttp.HeaderKey,
 		100*time.Millisecond,
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, r *http.Request, cause string) {
 			reachedUnauthedEndpoint = true
 			w.WriteHeader(wantCode)
-		}),
+		},
 	))
 	defer srv.Close()
 
